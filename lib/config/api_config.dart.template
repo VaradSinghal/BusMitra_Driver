@@ -1,0 +1,10 @@
+class ApiConfig {
+  // Replace with your actual Google Maps API key
+  static const String googleMapsApiKey = 'YOUR_GOOGLE_MAPS_API_KEY_HERE';
+  
+  // Directions API endpoints
+  static const String directionsBaseUrl = 'https://maps.googleapis.com/maps/api/directions/json';
+  
+  static const int requestTimeoutSeconds = 30;
+  static const int maxRetries = 3;
+}
