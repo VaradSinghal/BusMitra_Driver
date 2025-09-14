@@ -3,8 +3,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class LocationService {
-  static const int _updateIntervalSeconds = 30; // Update every 30 seconds
-  static const int _distanceFilterMeters = 5; // Update every 5 meters
+  static const int _updateIntervalSeconds = 10; // More frequent updates - every 10 seconds
+  static const int _distanceFilterMeters = 5; // Update every 5 meters for real-time tracking
 
   Future<Position> getCurrentLocation() async {
     bool serviceEnabled;
@@ -108,6 +108,6 @@ class LocationService {
 
   /// Check if location is accurate enough for tracking
   bool isLocationAccurate(Position position) {
-    return position.accuracy <= 50; // Within 50 meters accuracy
+    return position.accuracy <= 100; // More lenient - within 100 meters accuracy
   }
 }

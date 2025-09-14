@@ -251,7 +251,13 @@ class _MapScreenState extends State<MapScreen> {
       if (mounted) {
         setState(() {});
       }
-      _fitMapToRoute();
+      
+      // Always fit the map to show the entire route
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted && _mapController != null) {
+          _fitMapToRoute();
+        }
+      });
     } else {
       debugPrint('No route available, showing only current location');
       // Just show current location if no route
@@ -286,19 +292,31 @@ class _MapScreenState extends State<MapScreen> {
       if (point.longitude > maxLng) maxLng = point.longitude;
     }
 
+    // Calculate the span of the route
+    final latSpan = maxLat - minLat;
+    final lngSpan = maxLng - minLng;
+    final maxSpan = latSpan > lngSpan ? latSpan : lngSpan;
+
+    // Add some padding to the bounds to ensure the route is fully visible
+    final latPadding = latSpan * 0.15; // 15% padding
+    final lngPadding = lngSpan * 0.15; // 15% padding
+    
     final bounds = LatLngBounds(
-      southwest: LatLng(minLat, minLng),
-      northeast: LatLng(maxLat, maxLng),
+      southwest: LatLng(minLat - latPadding, minLng - lngPadding),
+      northeast: LatLng(maxLat + latPadding, maxLng + lngPadding),
     );
 
-    _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 100));
+    // Adjust padding based on route span for better zoom level
+    final padding = maxSpan > 0.1 ? 80.0 : 50.0; // Larger padding for longer routes
+    
+    _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, padding));
   }
 
   void _fitMapToCurrentLocation() {
     if (_mapController == null) return;
     
     _mapController!.animateCamera(
-      CameraUpdate.newLatLngZoom(_currentLocation, 14),
+      CameraUpdate.newLatLngZoom(_currentLocation, 15), // Better zoom level for current location
     );
   }
 
@@ -377,7 +395,7 @@ class _MapScreenState extends State<MapScreen> {
                       },
                       initialCameraPosition: CameraPosition(
                         target: _currentLocation,
-                        zoom: 14,
+                        zoom: 12, // Slightly more zoomed out initially
                       ),
                       polylines: _polylines,
                       markers: _markers,

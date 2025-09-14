@@ -1,6 +1,7 @@
-import 'dart:async' show StreamSubscription;
+import 'dart:async' show StreamSubscription, Timer;
 import 'package:busmitra_driver/screens/login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:busmitra_driver/utils/constants.dart';
 import 'package:busmitra_driver/widgets/status_indicator.dart';
@@ -31,6 +32,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 
   bool _isLoading = true;
   bool _isTracking = false;
+  bool _isConnected = true;
   BusRoute? _currentRoute;
   Map<String, dynamic>? _driverData;
   Map<String, dynamic>? _activeJourney;
@@ -88,17 +90,19 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       }
     });
   }
-  void _redirectToLogin() async {
+  Future<void> _redirectToLogin() async {
     if (mounted) {
       // Stop location tracking and clean up before redirecting
       if (_isTracking) {
-        _stopLocationTracking();
+        await _stopLocationTracking();
       }
       _databaseService.removeDriverFromActive();
       
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => LoginScreen()),
-      );
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => LoginScreen()),
+        );
+      }
     }
   }
   Future<void> _loadInitialData() async {
@@ -112,6 +116,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 
       await _loadDriverData();
       await _checkActiveJourney();
+      _startConnectionMonitoring();
     } catch (e) {
       debugPrint('Error loading initial data: $e');
       _showSnackBar('Error loading data: $e', AppConstants.errorColor);
@@ -137,7 +142,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
         if (_activeJourney != null) {
           _currentStatus = 'On Route';
           _statusColor = Colors.blue;
-          _isTracking = true;
+          _isTracking = true; // Ensure location tracking is ON for active journey
           _startLocationTracking();
         }
       });
@@ -211,7 +216,12 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 Future<void> _startJourney(BusRoute route) async {
   try {
     if (mounted) {
-      setState(() => _currentRoute = route);
+      setState(() {
+        _currentRoute = route;
+        _currentStatus = 'On Route';
+        _statusColor = Colors.blue;
+        _isTracking = true; // Automatically turn ON location tracking
+      });
     }
     await _databaseService.startJourney(route);
 
@@ -227,11 +237,17 @@ Future<void> _startJourney(BusRoute route) async {
       ),
     );
 
+    // Start location tracking (this will also update the UI state)
     _startLocationTracking();
   } catch (e) {
     _showSnackBar('Failed to start journey: $e', AppConstants.errorColor);
     if (mounted) {
-      setState(() => _currentRoute = null);
+      setState(() {
+        _currentRoute = null;
+        _currentStatus = 'Start Duty';
+        _statusColor = Colors.green;
+        _isTracking = false;
+      });
     }
   }
 }
@@ -281,8 +297,10 @@ Future<void> _startJourney(BusRoute route) async {
           : _locationService.getLocationStream();
 
       _locationSubscription = locationStream.listen((position) {
-        // Only update if location is accurate enough
-        if (_locationService.isLocationAccurate(position)) {
+        // Update location regardless of accuracy for continuous tracking
+        // Only skip if accuracy is extremely poor (>200m)
+        if (position.accuracy <= 200) {
+          // Use unawaited to prevent blocking the stream
           _databaseService.updateDriverLocation(
             _currentRoute?.id, // Pass null if no route
             position.latitude,
@@ -290,17 +308,34 @@ Future<void> _startJourney(BusRoute route) async {
             speed: position.speed,
             heading: position.heading,
             accuracy: position.accuracy,
-          );
+          ).catchError((error) {
+            debugPrint('Location update error: $error');
+            // Don't stop tracking for individual update failures
+          });
           debugPrint(
               'Location updated: ${position.latitude}, ${position.longitude} (accuracy: ${position.accuracy}m)');
         } else {
-          debugPrint('Location accuracy too low: ${position.accuracy}m, skipping update');
+          debugPrint('Location accuracy too poor: ${position.accuracy}m, skipping update');
         }
       }, onError: (error) {
         debugPrint('Location stream error: $error');
-        _showSnackBar('Location error: $error', AppConstants.errorColor);
-        if (mounted) {
-          setState(() => _isTracking = false);
+        
+        // Only show error to user if it's a critical error
+        if (error.toString().contains('permission') || 
+            error.toString().contains('service')) {
+          _showSnackBar('Location error: $error', AppConstants.errorColor);
+          if (mounted) {
+            setState(() => _isTracking = false);
+          }
+        } else {
+          // For network errors, try to continue tracking
+          debugPrint('Network error, continuing location tracking...');
+          // Attempt to restart location tracking
+          Future.delayed(const Duration(seconds: 5), () {
+            if (mounted && _isTracking) {
+              _startLocationTracking();
+            }
+          });
         }
       });
     } catch (e) {
@@ -327,7 +362,7 @@ Future<void> _startJourney(BusRoute route) async {
     }
   }
 
-  void _stopLocationTracking() async {
+  Future<void> _stopLocationTracking() async {
     _locationSubscription?.cancel();
     _locationSubscription = null;
     
@@ -353,11 +388,19 @@ Future<void> _startJourney(BusRoute route) async {
   }
 
   Future<void> _endJourney() async {
+    // Stop location tracking first
+    await _stopLocationTracking();
+    
+    // End the journey in database
     await _databaseService.endJourney();
+    
     if (mounted) {
       setState(() {
         _currentRoute = null;
         _activeJourney = null;
+        _currentStatus = 'Off Duty';
+        _statusColor = AppConstants.lightTextColor;
+        _isTracking = false; // Automatically turn OFF location tracking
       });
     }
   }
@@ -450,8 +493,10 @@ Future<void> _startJourney(BusRoute route) async {
     // Check if driver is on duty (any active status that requires location tracking)
     final isOnDuty = _currentStatus == 'On Route' || 
                      _currentStatus == 'Start Duty' || 
-                     _activeJourney != null;
+                     _activeJourney != null ||
+                     _currentRoute != null;
     
+    // If trying to turn OFF location sharing while on duty, show restriction dialog
     if (isOnDuty && _isTracking) {
       _showLocationSharingRestrictionDialog();
       return;
@@ -561,6 +606,57 @@ Future<void> _startJourney(BusRoute route) async {
     );
   }
 
+  // Monitor Firebase connection status and send heartbeat
+  void _startConnectionMonitoring() {
+    // Check connection status every 30 seconds
+    Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      
+      _checkConnectionStatus();
+    });
+
+    // Send heartbeat every 15 seconds when tracking
+    Timer.periodic(const Duration(seconds: 15), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      
+      if (_isTracking) {
+        _databaseService.sendHeartbeat().catchError((error) {
+          debugPrint('Heartbeat error: $error');
+        });
+      }
+    });
+  }
+
+  Future<void> _checkConnectionStatus() async {
+    try {
+      // Test Firebase connection with a simple write operation
+      final testData = {'test': 'connection', 'timestamp': ServerValue.timestamp};
+      await _databaseService.realtimeDb.ref('connection_test').set(testData).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => throw Exception('Connection timeout'),
+      );
+      
+      // Clean up test data
+      await _databaseService.realtimeDb.ref('connection_test').remove();
+      
+      if (mounted && !_isConnected) {
+        setState(() => _isConnected = true);
+        debugPrint('Firebase connection restored');
+      }
+    } catch (e) {
+      if (mounted && _isConnected) {
+        setState(() => _isConnected = false);
+        debugPrint('Firebase connection lost: $e');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -615,6 +711,27 @@ Future<void> _startJourney(BusRoute route) async {
               ),
             const SizedBox(height: 16),
             StatusIndicator(status: _currentStatus, color: _statusColor),
+            
+            // Connection Status Indicator
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  _isConnected ? Icons.cloud_done : Icons.cloud_off,
+                  color: _isConnected ? Colors.green : Colors.red,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _isConnected ? 'Connected to Firebase' : 'Connection Issues',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _isConnected ? Colors.green : Colors.red,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 20),
 
             // Location Sharing Toggle
@@ -672,7 +789,10 @@ Future<void> _startJourney(BusRoute route) async {
                       ),
                       Switch(
                         value: _isTracking,
-                        onChanged: (_activeJourney != null || _currentStatus == 'On Route' || _currentStatus == 'Start Duty') 
+                        onChanged: (_activeJourney != null || 
+                                   _currentStatus == 'On Route' || 
+                                   _currentStatus == 'Start Duty' ||
+                                   _currentRoute != null) 
                             ? null 
                             : (value) => _toggleLocationSharing(),
                         activeThumbColor: Colors.green,
@@ -727,7 +847,10 @@ Future<void> _startJourney(BusRoute route) async {
                       ),
                     ),
                   ],
-                  if ((_activeJourney != null || _currentStatus == 'On Route' || _currentStatus == 'Start Duty') && _isTracking) ...[
+                  if ((_activeJourney != null || 
+                       _currentStatus == 'On Route' || 
+                       _currentStatus == 'Start Duty' ||
+                       _currentRoute != null) && _isTracking) ...[
                     const SizedBox(height: 12),
                     Container(
                       width: double.infinity,

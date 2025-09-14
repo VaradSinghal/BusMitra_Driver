@@ -50,9 +50,6 @@ dependencies {
     // Google Play Services dependencies
     implementation("com.google.android.gms:play-services-base:18.3.0")
     implementation("com.google.android.gms:play-services-basement:18.3.0")
-    
-    // Add other Google Play Services you need
-    implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.android.gms:play-services-location:21.0.1")
 }
 flutter {

@@ -34,8 +34,8 @@ class BackgroundLocationService {
       // Configure location settings for background tracking
       const locationSettings = LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 10, // Update every 10 meters
-        timeLimit: Duration(seconds: 30), // Update every 30 seconds
+        distanceFilter: 5, // Update every 5 meters for real-time tracking
+        timeLimit: Duration(seconds: 10), // Update every 10 seconds for real-time tracking
       );
 
       _locationSubscription = Geolocator.getPositionStream(
@@ -73,8 +73,8 @@ class BackgroundLocationService {
   /// Handle location updates
   void _onLocationUpdate(Position position) async {
     try {
-      // Only update if location is accurate enough
-      if (position.accuracy <= 50) {
+      // Only update if location is accurate enough (more lenient for continuous tracking)
+      if (position.accuracy <= 100) {
         await _databaseService.updateDriverLocation(
           _currentRoute?.id,
           position.latitude,

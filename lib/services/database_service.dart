@@ -8,6 +8,14 @@ class DatabaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseDatabase _realtimeDb = FirebaseDatabase.instance;
   final CollectionReference _journeysCollection = FirebaseFirestore.instance.collection('journeys');
+  
+  // Make realtimeDb accessible for connection monitoring
+  FirebaseDatabase get realtimeDb => _realtimeDb;
+  
+  // Connection state tracking
+  bool _isConnected = true;
+  DateTime? _lastSuccessfulUpdate;
+  int _consecutiveFailures = 0;
 
   /// ================= FIRESTORE (static data) =================
 
@@ -33,6 +41,7 @@ class DatabaseService {
     try {
       final doc = await _firestore.collection('routes').doc(routeId).get();
       if (doc.exists) {
+        debugPrint('DatabaseService.getRouteById - Raw Firestore data: ${doc.data()}');
         return BusRoute.fromMap(doc.id, doc.data()!);
       }
       return null;
@@ -104,8 +113,33 @@ Future<void> startJourney(BusRoute route) async {
 
   // End journey → Firestore
   Future<void> endJourney() async {
-    final driverId = await AuthService().getCurrentDriverId();
-    await _firestore.collection('active_drivers').doc(driverId).delete();
+    try {
+      final driverId = await AuthService().getCurrentDriverId();
+      if (driverId == null) {
+        throw Exception('No driver is logged in');
+      }
+
+      // Remove from active drivers (realtime database)
+      await _firestore.collection('active_drivers').doc(driverId).delete();
+
+      // Update journey status in journeys collection
+      final journeyQuery = await _journeysCollection
+          .where('driverId', isEqualTo: driverId)
+          .where('status', isEqualTo: 'active')
+          .get();
+
+      if (journeyQuery.docs.isNotEmpty) {
+        final journeyDoc = journeyQuery.docs.first;
+        await journeyDoc.reference.update({
+          'status': 'completed',
+          'endTime': FieldValue.serverTimestamp(),
+        });
+        debugPrint('Journey ended successfully');
+      }
+    } catch (e) {
+      debugPrint('Error ending journey: $e');
+      throw Exception('Failed to end journey: $e');
+    }
   }
 
   // Check if driver has active journey
@@ -178,7 +212,13 @@ Future<void> startJourney(BusRoute route) async {
         return;
       }
 
-      // Get route name efficiently
+      // Skip update only if accuracy is very poor (more than 100m)
+      if (accuracy > 100) {
+        debugPrint('Location accuracy too poor: ${accuracy}m, skipping update');
+        return;
+      }
+
+      // Get route name efficiently (cache it to avoid repeated calls)
       String routeName = 'No Route';
       if (routeId != null && routeId.isNotEmpty && routeId != 'no_route') {
         routeName = await _getRouteName(routeId);
@@ -198,38 +238,84 @@ Future<void> startJourney(BusRoute route) async {
         'timestamp': ServerValue.timestamp,
         'isOnline': true,
         'lastSeen': ServerValue.timestamp,
-        'isOnDuty': true, // Indicate driver is on duty
+        'isOnDuty': true,
+        'connectionStatus': _isConnected ? 'connected' : 'reconnecting',
+        'updateCount': (_lastSuccessfulUpdate != null) ? 
+            DateTime.now().difference(_lastSuccessfulUpdate!).inSeconds : 0,
       };
 
-      // Update active driver location with retry mechanism
-      await _updateWithRetry('active_drivers/$driverId', locationData);
+      // Use set() for better reliability and immediate updates
+      await _realtimeDb.ref('active_drivers/$driverId').set(locationData).timeout(
+        const Duration(seconds: 8), // Slightly reduced timeout
+        onTimeout: () {
+          throw Exception('Database update timeout');
+        },
+      );
 
-      // Keep location history for analytics (only if accuracy is good)
-      if (accuracy <= 50) { // Only store accurate locations
-        await _realtimeDb.ref('location_history/$driverId').push().set({
-          'latitude': lat,
-          'longitude': lng,
-          'speed': speed,
-          'heading': heading,
-          'accuracy': accuracy,
-          'timestamp': ServerValue.timestamp,
-          'routeId': routeId ?? 'no_route',
-          'routeName': routeName,
-        });
-      }
+      // Update connection state on success
+      _onUpdateSuccess();
 
       debugPrint('Location updated successfully: $lat, $lng (accuracy: ${accuracy}m)');
     } catch (e) {
+      _onUpdateFailure();
       debugPrint('Error updating driver location: $e');
-      // Don't rethrow to prevent breaking the location stream
+      
+      // If too many consecutive failures, try to reconnect
+      if (_consecutiveFailures >= 3) {
+        await _attemptReconnection();
+      }
     }
   }
 
-  // Helper method to update with retry mechanism
+  // Removed rate limiting for continuous real-time updates
+
+  // Track successful updates
+  void _onUpdateSuccess() {
+    _lastSuccessfulUpdate = DateTime.now();
+    _consecutiveFailures = 0;
+    _isConnected = true;
+  }
+
+  // Track failed updates
+  void _onUpdateFailure() {
+    _consecutiveFailures++;
+    if (_consecutiveFailures >= 3) {
+      _isConnected = false;
+    }
+  }
+
+  // Attempt to reconnect to Firebase
+  Future<void> _attemptReconnection() async {
+    try {
+      debugPrint('Attempting to reconnect to Firebase...');
+      
+      // Test connection with a simple write operation instead of .info/connected
+      final testData = {'test': 'connection', 'timestamp': ServerValue.timestamp};
+      await _realtimeDb.ref('connection_test').set(testData).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => throw Exception('Connection test timeout'),
+      );
+      
+      // Clean up test data
+      await _realtimeDb.ref('connection_test').remove();
+      
+      _isConnected = true;
+      _consecutiveFailures = 0;
+      debugPrint('Successfully reconnected to Firebase');
+    } catch (e) {
+      debugPrint('Reconnection failed: $e');
+      _isConnected = false;
+    }
+  }
+
+  // Helper method to update with retry mechanism (kept for other operations)
   Future<void> _updateWithRetry(String path, Map<String, dynamic> data, {int maxRetries = 3}) async {
     for (int i = 0; i < maxRetries; i++) {
       try {
-        await _realtimeDb.ref(path).update(data);
+        await _realtimeDb.ref(path).update(data).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => throw Exception('Update timeout'),
+        );
         return;
       } catch (e) {
         debugPrint('Update attempt ${i + 1} failed: $e');
@@ -249,7 +335,7 @@ Future<void> startJourney(BusRoute route) async {
     }
   }
 
-  // Set driver online status
+  // Set driver online status with heartbeat
   Future<void> setDriverOnlineStatus(bool isOnline) async {
     try {
       final driverId = await AuthService().getCurrentDriverId();
@@ -257,15 +343,36 @@ Future<void> startJourney(BusRoute route) async {
 
       if (driverId == null) return;
 
-      await _realtimeDb.ref('active_drivers/$driverId').update({
+      final statusData = {
         'isOnline': isOnline,
         'lastSeen': ServerValue.timestamp,
+        'heartbeat': ServerValue.timestamp,
         'driverId': driverId,
         'driverName': driverData?['name'] ?? 'Unknown Driver',
         'busNumber': driverData?['busNumber'] ?? 'Unknown Bus',
-      });
+      };
+
+      await _realtimeDb.ref('active_drivers/$driverId').update(statusData).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => throw Exception('Status update timeout'),
+      );
     } catch (e) {
       debugPrint('Error setting driver online status: $e');
+    }
+  }
+
+  // Send heartbeat to keep driver online
+  Future<void> sendHeartbeat() async {
+    try {
+      final driverId = await AuthService().getCurrentDriverId();
+      if (driverId == null) return;
+
+      await _realtimeDb.ref('active_drivers/$driverId/heartbeat').set(ServerValue.timestamp).timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => throw Exception('Heartbeat timeout'),
+      );
+    } catch (e) {
+      debugPrint('Error sending heartbeat: $e');
     }
   }
 
