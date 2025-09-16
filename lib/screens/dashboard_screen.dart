@@ -4,7 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:busmitra_driver/utils/constants.dart';
-import 'package:busmitra_driver/widgets/status_indicator.dart';
+import 'package:busmitra_driver/widgets/modern_card.dart';
+import 'package:busmitra_driver/widgets/animated_widgets.dart';
 import 'package:busmitra_driver/services/location_service.dart';
 import 'package:busmitra_driver/services/database_service.dart';
 import 'package:busmitra_driver/services/auth_service.dart';
@@ -23,7 +24,7 @@ class DashboardScreen extends StatefulWidget {
 
 class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
   String _currentStatus = 'Off Duty';
-  Color _statusColor = AppConstants.lightTextColor;
+  Color _statusColor = AppConstants.textSecondary;
 
   final LocationService _locationService = LocationService();
   final DatabaseService _databaseService = DatabaseService();
@@ -175,7 +176,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             _endJourney();
             break;
           default:
-            _statusColor = AppConstants.lightTextColor;
+            _statusColor = AppConstants.textSecondary;
         }
       });
     }
@@ -399,7 +400,7 @@ Future<void> _startJourney(BusRoute route) async {
         _currentRoute = null;
         _activeJourney = null;
         _currentStatus = 'Off Duty';
-        _statusColor = AppConstants.lightTextColor;
+        _statusColor = AppConstants.textSecondary;
         _isTracking = false; // Automatically turn OFF location tracking
       });
     }
@@ -504,7 +505,7 @@ Future<void> _startJourney(BusRoute route) async {
     
     if (_isTracking) {
       _stopLocationTracking();
-      _showSnackBar('Location sharing stopped', AppConstants.lightTextColor);
+      _showSnackBar('Location sharing stopped', AppConstants.textSecondary);
     } else {
       _startLocationTracking();
       _showSnackBar('Location sharing started', Colors.green);
@@ -660,128 +661,344 @@ Future<void> _startJourney(BusRoute route) async {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
+      return Scaffold(
+        backgroundColor: AppConstants.backgroundColor,
         body: Center(
-          child: CircularProgressIndicator(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
             valueColor: AlwaysStoppedAnimation<Color>(AppConstants.primaryColor),
+                strokeWidth: 3,
+              ),
+              const SizedBox(height: AppConstants.spacingL),
+              Text(
+                'Loading Dashboard...',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: AppConstants.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ),
       );
     }
 
     return Scaffold(
+      backgroundColor: AppConstants.backgroundColor,
       appBar: AppBar(
-        title: const Text('Dashboard'),
+        title: Text(
+          'Dashboard',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: AppConstants.textOnPrimary,
+          ),
+        ),
         backgroundColor: AppConstants.primaryColor,
-        foregroundColor: AppConstants.accentColor,
+        foregroundColor: AppConstants.textOnPrimary,
+        elevation: 0,
+        centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.map),
+            icon: const Icon(Icons.map_outlined),
             onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const MapScreen()),
               );
             },
+            tooltip: 'View Map',
           ),
           IconButton(
-            icon: const Icon(Icons.person),
+            icon: const Icon(Icons.person_outline),
             onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const ProfileScreen()),
               );
             },
+            tooltip: 'Profile',
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+      body: RefreshIndicator(
+        onRefresh: _loadInitialData,
+        color: AppConstants.primaryColor,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              // Welcome Header
+              FadeInWidget(
+                delay: const Duration(milliseconds: 100),
+                child: _buildWelcomeHeader(),
+              ),
+              
+              // Status Card
+              FadeInWidget(
+                delay: const Duration(milliseconds: 200),
+                child: _buildStatusCard(),
+              ),
+              
+              // Connection Status
+              FadeInWidget(
+                delay: const Duration(milliseconds: 300),
+                child: _buildConnectionStatus(),
+              ),
+              
+              // Location Sharing Card
+              FadeInWidget(
+                delay: const Duration(milliseconds: 400),
+                child: _buildLocationSharingCard(),
+              ),
+              
+              // Current Route Card
+              if (_currentRoute != null || _activeJourney != null)
+                FadeInWidget(
+                  delay: const Duration(milliseconds: 500),
+                  child: _buildCurrentRouteCard(),
+                ),
+              
+              // Status Actions
+              FadeInWidget(
+                delay: const Duration(milliseconds: 600),
+                child: _buildStatusActions(),
+              ),
+              
+              // Quick Actions
+              FadeInWidget(
+                delay: const Duration(milliseconds: 700),
+                child: _buildQuickActions(),
+              ),
+              
+              const SizedBox(height: AppConstants.spacingXL),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWelcomeHeader() {
+    return GradientCard(
+      gradientColors: AppConstants.primaryGradient,
+      margin: const EdgeInsets.all(AppConstants.spacingM),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppConstants.spacingM),
+            decoration: BoxDecoration(
+              color: AppConstants.textOnPrimary.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(AppConstants.radiusL),
+            ),
+            child: Icon(
+              Icons.directions_bus,
+              size: 32,
+              color: AppConstants.textOnPrimary,
+            ),
+          ),
+          const SizedBox(width: AppConstants.spacingM),
+          Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (_driverData != null)
               Text(
-                'Hello, ${_driverData!['name'] ?? 'Driver'}!',
+                  'Welcome back!',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppConstants.textOnPrimary.withValues(alpha: 0.8),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: AppConstants.spacingXS),
+                Text(
+                  _driverData?['name'] ?? 'Driver',
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: AppConstants.textColor,
+                    color: AppConstants.textOnPrimary,
+                  ),
                 ),
-              ),
-            const SizedBox(height: 16),
-            StatusIndicator(status: _currentStatus, color: _statusColor),
-            
-            // Connection Status Indicator
-            const SizedBox(height: 8),
+                if (_driverData?['busNumber'] != null) ...[
+                  const SizedBox(height: AppConstants.spacingXS),
+                  Text(
+                    'Bus: ${_driverData!['busNumber']}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppConstants.textOnPrimary.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusCard() {
+    final isActive = _currentStatus == 'On Route' || _currentStatus == 'Start Duty';
+    
+    return ModernCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
             Row(
               children: [
-                Icon(
-                  _isConnected ? Icons.cloud_done : Icons.cloud_off,
-                  color: _isConnected ? Colors.green : Colors.red,
-                  size: 16,
-                ),
-                const SizedBox(width: 8),
+              isActive 
+                ? PulseWidget(
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: _statusColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  )
+                : Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: _statusColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+              const SizedBox(width: AppConstants.spacingS),
                 Text(
-                  _isConnected ? 'Connected to Firebase' : 'Connection Issues',
+                'Current Status',
                   style: TextStyle(
-                    fontSize: 12,
-                    color: _isConnected ? Colors.green : Colors.red,
-                    fontWeight: FontWeight.w500,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppConstants.textColor,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-
-            // Location Sharing Toggle
+          const SizedBox(height: AppConstants.spacingM),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppConstants.spacingM),
               decoration: BoxDecoration(
-                color: AppConstants.accentColor,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+              color: _statusColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppConstants.radiusM),
+              border: Border.all(
+                color: _statusColor.withValues(alpha: 0.3),
+                width: 1,
+              ),
+            ),
+            child: Text(
+              _currentStatus,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: _statusColor,
+              ),
+              textAlign: TextAlign.center,
+            ),
                   ),
                 ],
               ),
+    );
+  }
+
+  Widget _buildConnectionStatus() {
+    return ModernCard(
+      margin: const EdgeInsets.symmetric(horizontal: AppConstants.spacingM),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppConstants.spacingS),
+            decoration: BoxDecoration(
+              color: _isConnected 
+                  ? AppConstants.successColor.withValues(alpha: 0.1)
+                  : AppConstants.errorColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppConstants.radiusS),
+            ),
+            child: Icon(
+              _isConnected ? Icons.cloud_done : Icons.cloud_off,
+              color: _isConnected ? AppConstants.successColor : AppConstants.errorColor,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: AppConstants.spacingM),
+          Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _isConnected ? 'Connected' : 'Connection Issues',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _isConnected ? AppConstants.successColor : AppConstants.errorColor,
+                  ),
+                ),
+                Text(
+                  _isConnected ? 'Firebase Realtime Database' : 'Check your internet connection',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppConstants.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLocationSharingCard() {
+    final isLocked = (_activeJourney != null || 
+                     _currentStatus == 'On Route' || 
+                     _currentStatus == 'Start Duty' ||
+                     _currentRoute != null) && _isTracking;
+
+    return ModernCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(
+              Container(
+                padding: const EdgeInsets.all(AppConstants.spacingS),
+                decoration: BoxDecoration(
+                  color: _isTracking 
+                      ? AppConstants.successColor.withValues(alpha: 0.1)
+                      : AppConstants.textSecondary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                ),
+                child: Icon(
                         _isTracking ? Icons.location_on : Icons.location_off,
-                        color: _isTracking ? Colors.green : AppConstants.lightTextColor,
-                        size: 24,
+                  color: _isTracking ? AppConstants.successColor : AppConstants.textSecondary,
+                  size: 20,
                       ),
-                      const SizedBox(width: 12),
+              ),
+              const SizedBox(width: AppConstants.spacingM),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               'Live Location Sharing',
                               style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: _isTracking ? Colors.green : AppConstants.textColor,
+                        fontWeight: FontWeight.w600,
+                        color: AppConstants.textColor,
                               ),
                             ),
-                            const SizedBox(height: 4),
                             Text(
                               _isTracking
-                                  ? 'Your location is being shared with passengers'
-                                  : 'Location sharing is disabled',
+                          ? 'Sharing with passengers'
+                          : 'Location sharing disabled',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: _isTracking ? Colors.green : AppConstants.lightTextColor,
+                        color: AppConstants.textSecondary,
                               ),
                             ),
                           ],
@@ -789,217 +1006,434 @@ Future<void> _startJourney(BusRoute route) async {
                       ),
                       Switch(
                         value: _isTracking,
-                        onChanged: (_activeJourney != null || 
-                                   _currentStatus == 'On Route' || 
-                                   _currentStatus == 'Start Duty' ||
-                                   _currentRoute != null) 
-                            ? null 
-                            : (value) => _toggleLocationSharing(),
-                        activeThumbColor: Colors.green,
-                        inactiveThumbColor: AppConstants.lightTextColor,
-                        inactiveTrackColor: AppConstants.lightTextColor.withValues(alpha: 0.3),
+                onChanged: isLocked ? null : (value) => _toggleLocationSharing(),
+                activeThumbColor: AppConstants.successColor,
+                inactiveThumbColor: AppConstants.textSecondary,
+                inactiveTrackColor: AppConstants.textSecondary.withValues(alpha: 0.3),
                       ),
                     ],
                   ),
-                  if (_isTracking) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.info_outline, color: Colors.green, size: 16),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Location data is being sent to Firebase Realtime Database for passenger tracking',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.green[700],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              const Icon(Icons.update, color: Colors.green, size: 14),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Updates every 30 seconds or 5 meters movement',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.green[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  if ((_activeJourney != null || 
-                       _currentStatus == 'On Route' || 
-                       _currentStatus == 'Start Duty' ||
-                       _currentRoute != null) && _isTracking) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.lock, color: Colors.orange, size: 16),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Location sharing is locked during active trip. End your trip to disable.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.orange[700],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
+                   if (_isTracking) ...[
+          const SizedBox(height: AppConstants.spacingM),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppConstants.spacingM),
+            decoration: BoxDecoration(
+              color: AppConstants.successColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppConstants.radiusM),
+              border: Border.all(
+                color: AppConstants.successColor.withValues(alpha: 0.3),
+                width: 1,
               ),
             ),
-
-            const SizedBox(height: 20),
-
-            // Current route
-            if (_currentRoute != null || _activeJourney != null)
-              Card(
-                elevation: 4,
-                color: AppConstants.accentColor,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: AppConstants.successColor,
+                      size: 16,
+                    ),
+                    const SizedBox(width: AppConstants.spacingS),
+                    Expanded( // Wrap with Expanded
+                      child: Text(
+                        'Location data is being sent to Firebase for passenger tracking',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppConstants.successColor,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppConstants.spacingS),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.update,
+                      color: AppConstants.successColor,
+                      size: 14,
+                    ),
+                    const SizedBox(width: AppConstants.spacingS),
+                    Expanded( // Wrap with Expanded
+                      child: Text(
+                        'Updates every 30 seconds or 5 meters movement',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppConstants.successColor.withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+        
+        if (isLocked) ...[
+          const SizedBox(height: AppConstants.spacingM),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppConstants.spacingM),
+            decoration: BoxDecoration(
+              color: AppConstants.warningColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppConstants.radiusM),
+              border: Border.all(
+                color: AppConstants.warningColor.withValues(alpha: 0.3),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.lock,
+                  color: AppConstants.warningColor,
+                  size: 16,
+                ),
+                const SizedBox(width: AppConstants.spacingS),
+                Expanded( // Wrap with Expanded
+                  child: Text(
+                    'Location sharing is locked during active trip',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppConstants.warningColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+  }
+  
+  Widget _buildCurrentRouteCard() {
+    return GradientCard(
+      gradientColors: AppConstants.infoColor.withValues(alpha: 0.1) == AppConstants.infoColor.withValues(alpha: 0.1) 
+          ? [AppConstants.infoColor.withValues(alpha: 0.1), AppConstants.infoColor.withValues(alpha: 0.05)]
+          : AppConstants.primaryGradient,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Current Route',
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppConstants.spacingS),
+                decoration: BoxDecoration(
+                  color: AppConstants.infoColor.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                ),
+                child: Icon(
+                  Icons.route,
+                  color: AppConstants.infoColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: AppConstants.spacingM),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Current Route',
                           style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                             color: AppConstants.textColor,
-                          )),
-                      const SizedBox(height: 10),
+                      ),
+                    ),
                       Text(
                         _activeJourney?['routeName'] ?? _currentRoute?.name ?? '',
-                        style: const TextStyle(
-                          color: AppConstants.textColor,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppConstants.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppConstants.spacingM),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppConstants.spacingM),
+            decoration: BoxDecoration(
+              color: AppConstants.infoColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppConstants.radiusM),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${_currentRoute?.startPoint ?? 'Start'} → ${_currentRoute?.endPoint ?? 'End'}',
+                  style: TextStyle(
                           fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppConstants.textColor,
                         ),
                       ),
-                      const SizedBox(height: 5),
+                const SizedBox(height: AppConstants.spacingS),
                       Text(
                         'Bus: ${_driverData?['busNumber'] ?? 'Unknown'}',
-                        style: const TextStyle(color: AppConstants.lightTextColor),
-                      ),
-                      const SizedBox(height: 15),
-                      ElevatedButton(
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppConstants.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppConstants.spacingM),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
                         onPressed: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(builder: (context) => const MapScreen()),
                           );
                         },
+              icon: const Icon(Icons.map_outlined),
+              label: const Text('View Live Route'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppConstants.primaryColor,
-                          foregroundColor: AppConstants.accentColor,
-                        ),
-                        child: const Text('View Live Route on Map'),
-                      ),
-                    ],
-                  ),
+                backgroundColor: AppConstants.infoColor,
+                foregroundColor: AppConstants.textOnPrimary,
+                padding: const EdgeInsets.symmetric(vertical: AppConstants.spacingM),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppConstants.radiusM),
                 ),
               ),
-
-            const SizedBox(height: 20),
-
-            const Text('Change Status:',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppConstants.textColor,
-                )),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              alignment: WrapAlignment.start,
-              children: [
-                if (_currentStatus != 'Start Duty' && _currentStatus != 'On Route')
-                  _buildStatusButton('Start Duty', Colors.green),
-                if (_currentStatus == 'Start Duty' || _currentStatus == 'Break')
-                  _buildStatusButton('On Route', Colors.blue),
-                if (_currentStatus == 'On Route')
-                  _buildStatusButton('Break', Colors.orange),
-                if (_currentStatus == 'On Route' || _currentStatus == 'Break')
-                  _buildStatusButton('End Duty', AppConstants.errorColor),
-              ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
 
-            const SizedBox(height: 20),
-
-            const Text('Quick Actions',
+  Widget _buildStatusActions() {
+    return ModernCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppConstants.spacingS),
+                decoration: BoxDecoration(
+                  color: AppConstants.primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                ),
+                child: Icon(
+                  Icons.work_outline,
+                  color: AppConstants.primaryColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: AppConstants.spacingM),
+              Text(
+                'Change Status',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: AppConstants.textColor,
-                )),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              alignment: WrapAlignment.start,
-              children: [
-                ActionChip(
-                  label: const Text('Report Issue'),
-                  onPressed: _showIssueDialog,
-                  backgroundColor: AppConstants.primaryColor,
-                  labelStyle: const TextStyle(color: Colors.white),
                 ),
-                ActionChip(
-                  label: const Text('SOS Emergency'),
-                  onPressed: _triggerSOS,
-                  backgroundColor: AppConstants.errorColor,
-                  labelStyle: const TextStyle(color: Colors.white),
-                ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppConstants.spacingL),
+          _buildStatusGrid(),
+        ],
       ),
     );
   }
 
-  Widget _buildStatusButton(String text, Color color) {
-    return ElevatedButton(
-      onPressed: () => _changeStatus(text),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: AppConstants.accentColor,
+Widget _buildStatusGrid() {
+  final availableStatuses = _getAvailableStatuses();
+  final itemCount = availableStatuses.length;
+  final crossAxisCount = itemCount > 2 ? 2 : itemCount;
+  final rowCount = (itemCount / crossAxisCount).ceil();
+  final itemHeight = 100.0; // Approximate height of each item
+  
+  return Container(
+    height: (rowCount * itemHeight) + ((rowCount - 1) * AppConstants.spacingM),
+    child: GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        crossAxisSpacing: AppConstants.spacingM,
+        mainAxisSpacing: AppConstants.spacingM,
+        childAspectRatio: 2.2,
       ),
-      child: Text(text),
+      itemCount: itemCount,
+      itemBuilder: (context, index) {
+        final status = availableStatuses[index];
+        return _buildStatusButton(status);
+      },
+    ),
+  );
+}
+
+  List<Map<String, dynamic>> _getAvailableStatuses() {
+    final statuses = <Map<String, dynamic>>[];
+    
+    if (_currentStatus != 'Start Duty' && _currentStatus != 'On Route') {
+      statuses.add({
+        'label': 'Start Duty',
+        'color': AppConstants.successColor,
+        'icon': Icons.play_arrow,
+        'description': 'Begin your shift',
+      });
+    }
+    
+    if (_currentStatus == 'Start Duty' || _currentStatus == 'Break') {
+      statuses.add({
+        'label': 'On Route',
+        'color': AppConstants.infoColor,
+        'icon': Icons.directions_bus,
+        'description': 'Start driving',
+      });
+    }
+    
+    if (_currentStatus == 'On Route') {
+      statuses.add({
+        'label': 'Break',
+        'color': AppConstants.warningColor,
+        'icon': Icons.pause,
+        'description': 'Take a break',
+      });
+    }
+    
+    if (_currentStatus == 'On Route' || _currentStatus == 'Break') {
+      statuses.add({
+        'label': 'End Duty',
+        'color': AppConstants.errorColor,
+        'icon': Icons.stop,
+        'description': 'Finish shift',
+      });
+    }
+    
+    return statuses;
+  }
+Widget _buildStatusButton(Map<String, dynamic> status) {
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: () => _changeStatus(status['label']),
+      borderRadius: BorderRadius.circular(AppConstants.radiusM),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: AppConstants.spacingS, horizontal: AppConstants.spacingM),
+        decoration: BoxDecoration(
+          color: status['color'].withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(AppConstants.radiusM),
+          border: Border.all(
+            color: status['color'].withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              status['icon'],
+              color: status['color'],
+              size: 20,
+            ),
+            const SizedBox(width: AppConstants.spacingS),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    status['label'],
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: status['color'],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    status['description'],
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: status['color'].withValues(alpha: 0.7),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+  Widget _buildQuickActions() {
+    return ModernCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Quick Actions',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppConstants.textColor,
+            ),
+          ),
+          const SizedBox(height: AppConstants.spacingM),
+          Row(
+              children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _showIssueDialog,
+                  icon: const Icon(Icons.report_problem_outlined),
+                  label: const Text('Report Issue'),
+                  style: ElevatedButton.styleFrom(
+                  backgroundColor: AppConstants.primaryColor,
+                    foregroundColor: AppConstants.textOnPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: AppConstants.spacingM),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppConstants.spacingM),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _triggerSOS,
+                  icon: const Icon(Icons.emergency),
+                  label: const Text('SOS'),
+                  style: ElevatedButton.styleFrom(
+                  backgroundColor: AppConstants.errorColor,
+                    foregroundColor: AppConstants.textOnPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: AppConstants.spacingM),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                    ),
+                  ),
+                ),
+                ),
+              ],
+            ),
+          ],
+      ),
     );
   }
+
 }

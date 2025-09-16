@@ -2,11 +2,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:busmitra_driver/utils/constants.dart';
+import 'package:busmitra_driver/widgets/modern_card.dart';
+import 'package:busmitra_driver/widgets/animated_widgets.dart';
 import 'package:busmitra_driver/services/location_service.dart';
 import 'package:busmitra_driver/services/database_service.dart';
 import 'package:busmitra_driver/services/directions_service.dart';
 import 'package:busmitra_driver/models/route_model.dart';
-import 'package:busmitra_driver/test_data/route_8b_test.dart';
 
 class MapScreen extends StatefulWidget {
   final BusRoute? route;
@@ -63,6 +64,41 @@ class _MapScreenState extends State<MapScreen> {
     super.dispose();
   }
 
+  BusRoute _createTestRoute() {
+    return BusRoute(
+      id: 'test_route_8b',
+      name: 'Route 8B',
+      startPoint: 'Central Station',
+      endPoint: 'Airport Terminal',
+      distance: 15.5,
+      estimatedTime: 45,
+      active: true,
+      stops: [
+        RouteStop(
+          id: 'stop_1',
+          name: 'Central Station',
+          latitude: 28.6139,
+          longitude: 77.2090,
+          sequence: 1,
+        ),
+        RouteStop(
+          id: 'stop_2',
+          name: 'City Center',
+          latitude: 28.6140,
+          longitude: 77.2100,
+          sequence: 2,
+        ),
+        RouteStop(
+          id: 'stop_3',
+          name: 'Airport Terminal',
+          latitude: 28.6150,
+          longitude: 77.2110,
+          sequence: 3,
+        ),
+      ],
+    );
+  }
+
   Widget _buildMapErrorWidget() {
     return Center(
       child: Padding(
@@ -90,7 +126,7 @@ class _MapScreenState extends State<MapScreen> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
-                color: AppConstants.lightTextColor,
+                color: AppConstants.textSecondary,
               ),
             ),
             const SizedBox(height: 20),
@@ -124,7 +160,7 @@ class _MapScreenState extends State<MapScreen> {
                 '${_currentRoute!.startPoint} → ${_currentRoute!.endPoint}',
                 style: TextStyle(
                   fontSize: 12,
-                  color: AppConstants.lightTextColor,
+                  color: AppConstants.textSecondary,
                 ),
               ),
             ],
@@ -146,14 +182,14 @@ class _MapScreenState extends State<MapScreen> {
         // Use test route if no active journey found
         debugPrint('No active journey found, using test route');
         if (mounted) {
-          setState(() => _currentRoute = Route8BTestData.getRoute8B());
+          setState(() => _currentRoute = _createTestRoute());
         }
       }
     } catch (e) {
       debugPrint('Error loading active route: $e');
       // Use test route as fallback
       if (mounted) {
-        setState(() => _currentRoute = Route8BTestData.getRoute8B());
+        setState(() => _currentRoute = _createTestRoute());
       }
     } finally {
       if (mounted) {
@@ -361,26 +397,39 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     debugPrint('MapScreen build: _isLoading=$_isLoading, _currentRoute=${_currentRoute?.name}, markers=${_markers.length}');
     return Scaffold(
+      backgroundColor: AppConstants.backgroundColor,
       appBar: AppBar(
-        title: Text(_currentRoute?.name ?? 'Live Map'),
+        title: Text(
+          _currentRoute?.name ?? 'Live Map',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: AppConstants.textOnPrimary,
+          ),
+        ),
         backgroundColor: AppConstants.primaryColor,
-        foregroundColor: AppConstants.accentColor,
+        foregroundColor: AppConstants.textOnPrimary,
+        elevation: 0,
+        centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.my_location),
+            icon: const Icon(Icons.my_location_outlined),
             onPressed: _getCurrentLocation,
+            tooltip: 'My Location',
           ),
           if (_currentRoute != null)
             IconButton(
-              icon: const Icon(Icons.zoom_out_map),
+              icon: const Icon(Icons.zoom_out_map_outlined),
               onPressed: _fitMapToRoute,
+              tooltip: 'Fit Route',
             ),
         ],
       ),
       body: Stack(
         children: [
+          // Map or Loading/Error State
           _isLoading
-              ? const Center(child: CircularProgressIndicator())
+              ? _buildLoadingState()
               : _mapError
                   ? _buildMapErrorWidget()
                   : GoogleMap(
@@ -395,58 +444,313 @@ class _MapScreenState extends State<MapScreen> {
                       },
                       initialCameraPosition: CameraPosition(
                         target: _currentLocation,
-                        zoom: 12, // Slightly more zoomed out initially
+                        zoom: 12,
                       ),
                       polylines: _polylines,
                       markers: _markers,
                       myLocationEnabled: true,
                       myLocationButtonEnabled: false,
                       compassEnabled: true,
+                      mapToolbarEnabled: false,
+                      zoomControlsEnabled: false,
                     ),
+          
+          // Loading Directions Overlay
           if (_isLoadingDirections)
             Container(
               color: Colors.black.withValues(alpha: 0.3),
-              child: const Center(
-                child: Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text('Loading road directions...'),
-                      ],
-                    ),
+              child: Center(
+                child: ModernCard(
+                  margin: const EdgeInsets.all(AppConstants.spacingL),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(AppConstants.primaryColor),
+                        strokeWidth: 3,
+                      ),
+                      const SizedBox(height: AppConstants.spacingM),
+                      Text(
+                        'Loading road directions...',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: AppConstants.textColor,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
+          
+          // Route Information Panel
+          if (_currentRoute != null && !_isLoading && !_mapError)
+            Positioned(
+              top: AppConstants.spacingM,
+              left: AppConstants.spacingM,
+              right: AppConstants.spacingM,
+              child: SlideInWidget(
+                direction: SlideDirection.fromTop,
+                child: _buildRouteInfoPanel(),
+              ),
+            ),
+          
+          // Map Controls Panel
+          if (!_isLoading && !_mapError)
+            Positioned(
+              bottom: AppConstants.spacingL,
+              right: AppConstants.spacingM,
+              child: SlideInWidget(
+                direction: SlideDirection.fromRight,
+                delay: const Duration(milliseconds: 300),
+                child: _buildMapControlsPanel(),
+              ),
+            ),
         ],
       ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Container(
+      color: AppConstants.backgroundColor,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppConstants.primaryColor),
+              strokeWidth: 3,
+            ),
+            const SizedBox(height: AppConstants.spacingL),
+            Text(
+              'Loading Map...',
+              style: TextStyle(
+                fontSize: 16,
+                color: AppConstants.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRouteInfoPanel() {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppConstants.radiusL),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ModernCard(
+        margin: EdgeInsets.zero,
+        backgroundColor: AppConstants.surfaceColor.withValues(alpha: 0.95),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(AppConstants.spacingS),
+                  decoration: BoxDecoration(
+                    color: AppConstants.primaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                  ),
+                  child: Icon(
+                    Icons.route,
+                    color: AppConstants.primaryColor,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: AppConstants.spacingM),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _currentRoute?.name ?? 'Route',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppConstants.textColor,
+                        ),
+                      ),
+                      Text(
+                        '${_currentRoute?.stops.length ?? 0} stops',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppConstants.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                PulseWidget(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppConstants.spacingS,
+                      vertical: AppConstants.spacingXS,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppConstants.successColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                      border: Border.all(
+                        color: AppConstants.successColor.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Text(
+                      'ACTIVE',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: AppConstants.successColor,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppConstants.spacingM),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppConstants.spacingM),
+              decoration: BoxDecoration(
+                color: AppConstants.primaryColor.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(AppConstants.radiusM),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on,
+                        color: AppConstants.successColor,
+                        size: 16,
+                      ),
+                      const SizedBox(width: AppConstants.spacingS),
+                      Expanded(
+                        child: Text(
+                          _currentRoute?.startPoint ?? 'Start Point',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppConstants.textColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppConstants.spacingS),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on,
+                        color: AppConstants.errorColor,
+                        size: 16,
+                      ),
+                      const SizedBox(width: AppConstants.spacingS),
+                      Expanded(
+                        child: Text(
+                          _currentRoute?.endPoint ?? 'End Point',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppConstants.textColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMapControlsPanel() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Route Setup Button
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppConstants.radiusL),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: FloatingActionButton(
             onPressed: () {
               debugPrint('Manual route setup triggered');
               _setUpRouteOnMap();
             },
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
+            backgroundColor: AppConstants.infoColor,
+            foregroundColor: AppConstants.textOnPrimary,
             heroTag: "route_setup",
             child: const Icon(Icons.route),
           ),
-          const SizedBox(height: 10),
-          FloatingActionButton(
+        ),
+        const SizedBox(height: AppConstants.spacingM),
+        // My Location Button
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppConstants.radiusL),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: FloatingActionButton(
             onPressed: _getCurrentLocation,
             backgroundColor: AppConstants.primaryColor,
-            foregroundColor: AppConstants.accentColor,
+            foregroundColor: AppConstants.textOnPrimary,
             heroTag: "location",
             child: const Icon(Icons.my_location),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: AppConstants.spacingM),
+        // Fit Route Button (only show if route exists)
+        if (_currentRoute != null)
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppConstants.radiusL),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: FloatingActionButton(
+              onPressed: _fitMapToRoute,
+              backgroundColor: AppConstants.successColor,
+              foregroundColor: AppConstants.textOnPrimary,
+              heroTag: "fit_route",
+              child: const Icon(Icons.zoom_out_map),
+            ),
+          ),
+      ],
     );
   }
 }

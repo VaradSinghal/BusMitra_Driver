@@ -49,7 +49,7 @@ class BusMitraApp extends StatelessWidget {
           bodyLarge: TextStyle(fontSize: 16, color: AppConstants.textColor),
           bodyMedium: TextStyle(
             fontSize: 14,
-            color: AppConstants.lightTextColor,
+            color: AppConstants.textSecondary,
           ),
         ),
         fontFamily: 'Roboto',

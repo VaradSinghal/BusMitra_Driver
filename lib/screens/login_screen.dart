@@ -251,7 +251,7 @@ class LoginScreenState extends State<LoginScreen> with SingleTickerProviderState
                               // Support Text
                               const Text(
                                 'Need help? Contact Support',
-                                style: TextStyle(color: AppConstants.lightTextColor),
+                                style: TextStyle(color: AppConstants.textSecondary),
                               ),
                             ],
                           ),

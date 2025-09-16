@@ -3,6 +3,8 @@ import 'package:busmitra_driver/services/database_service.dart';
 import 'package:flutter/material.dart';
 import 'package:busmitra_driver/utils/constants.dart';
 import 'package:busmitra_driver/services/auth_service.dart';
+import 'package:busmitra_driver/widgets/modern_card.dart';
+import 'package:busmitra_driver/widgets/animated_widgets.dart';
 
 
 class ProfileScreen extends StatefulWidget {
@@ -25,7 +27,7 @@ class ProfileScreenState extends State<ProfileScreen> {
     _loadDriverData();
   }
 
-  void _loadDriverData() async {
+  Future<void> _loadDriverData() async {
     try {
       final data = await _authService.getCurrentDriverData();
       setState(() {
@@ -78,155 +80,89 @@ class ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-      @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppConstants.backgroundColor,
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: Text(
+          'Profile',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: AppConstants.textOnPrimary,
+          ),
+        ),
         backgroundColor: AppConstants.primaryColor,
-        foregroundColor: AppConstants.accentColor,
+        foregroundColor: AppConstants.textOnPrimary,
+        elevation: 0,
+        centerTitle: true,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  // Profile Header (existing code)
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: AppConstants.accentColor,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+          ? _buildLoadingState()
+          : RefreshIndicator(
+              onRefresh: _loadDriverData,
+              color: AppConstants.primaryColor,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  children: [
+                    // Profile Header
+                    FadeInWidget(
+                      delay: const Duration(milliseconds: 100),
+                      child: _buildProfileHeader(),
                     ),
-                    child: Column(
-                      children: [
-                        CircleAvatar(
-                          radius: 50,
-                          backgroundColor: AppConstants.primaryColor,
-                          child: const Icon(
-                            Icons.person,
-                            size: 50,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _driverData?['name'] ?? 'Unknown Driver',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: AppConstants.textColor,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _driverData?['driverId'] ?? 'No ID',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: AppConstants.lightTextColor,
-                          ),
-                        ),
-                      ],
+                    
+                    // Driver Information
+                    FadeInWidget(
+                      delay: const Duration(milliseconds: 200),
+                      child: _buildDriverInfo(),
                     ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Assigned Route Information
-                  if (_assignedRoute != null)
-                    Card(
-                      elevation: 4,
-                      color: AppConstants.accentColor,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Assigned Route',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppConstants.textColor,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              _assignedRoute!.name,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: AppConstants.textColor,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '${_assignedRoute!.startPoint} to ${_assignedRoute!.endPoint}',
-                              style: const TextStyle(
-                                color: AppConstants.lightTextColor,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Distance: ${_assignedRoute!.distance} km • Time: ${_assignedRoute!.estimatedTime} min',
-                              style: const TextStyle(
-                                color: AppConstants.lightTextColor,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Stops: ${_assignedRoute!.stops.length}',
-                              style: const TextStyle(
-                                color: AppConstants.lightTextColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    
+                    // Assigned Route
+                    FadeInWidget(
+                      delay: const Duration(milliseconds: 300),
+                      child: _buildAssignedRoute(),
                     ),
-
-                  if (_assignedRoute == null)
-                    const Card(
-                      child: Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Text(
-                          'No route assigned',
-                          style: TextStyle(
-                            color: AppConstants.lightTextColor,
-                          ),
-                        ),
-                      ),
+                    
+                    // Statistics
+                    FadeInWidget(
+                      delay: const Duration(milliseconds: 400),
+                      child: _buildStatistics(),
                     ),
-
-            const SizedBox(height: 30),
-
-            // Logout Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _logout,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppConstants.errorColor,
-                  foregroundColor: AppConstants.accentColor,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                    
+                    // Actions
+                    FadeInWidget(
+                      delay: const Duration(milliseconds: 500),
+                      child: _buildActions(),
+                    ),
+                    
+                    const SizedBox(height: AppConstants.spacingXL),
+                  ],
                 ),
-                child: const Text(
-                  'Logout',
-                  style: TextStyle(fontSize: 16),
-                ),
+              ),
+            ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Container(
+      color: AppConstants.backgroundColor,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppConstants.primaryColor),
+              strokeWidth: 3,
+            ),
+            const SizedBox(height: AppConstants.spacingL),
+            Text(
+              'Loading Profile...',
+              style: TextStyle(
+                fontSize: 16,
+                color: AppConstants.textSecondary,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -235,31 +171,593 @@ class ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _buildProfileHeader() {
+    return GradientCard(
+      gradientColors: AppConstants.primaryGradient,
+      margin: const EdgeInsets.all(AppConstants.spacingM),
+      child: Column(
+        children: [
+          // Profile Picture
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppConstants.textOnPrimary.withValues(alpha: 0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: CircleAvatar(
+              radius: 60,
+              backgroundColor: AppConstants.textOnPrimary.withValues(alpha: 0.2),
+              child: Icon(
+                Icons.person,
+                size: 60,
+                color: AppConstants.textOnPrimary,
+              ),
+            ),
+          ),
+          const SizedBox(height: AppConstants.spacingL),
+          
+          // Driver Name
+          Text(
+            _driverData?['name'] ?? 'Unknown Driver',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: AppConstants.textOnPrimary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppConstants.spacingS),
+          
+          // Driver ID
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppConstants.spacingM,
+              vertical: AppConstants.spacingS,
+            ),
+            decoration: BoxDecoration(
+              color: AppConstants.textOnPrimary.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(AppConstants.radiusL),
+            ),
+            child: Text(
+              'ID: ${_driverData?['driverId'] ?? 'No ID'}',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppConstants.textOnPrimary.withValues(alpha: 0.9),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDriverInfo() {
+    return ModernCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppConstants.spacingS),
+                decoration: BoxDecoration(
+                  color: AppConstants.infoColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                ),
+                child: Icon(
+                  Icons.info_outline,
+                  color: AppConstants.infoColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: AppConstants.spacingM),
+              Text(
+                'Driver Information',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppConstants.textColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppConstants.spacingL),
+          
+          _buildInfoRow(
+            'Phone Number',
+            _driverData?['phone'] ?? 'Not provided',
+            Icons.phone,
+          ),
+          _buildInfoRow(
+            'Email',
+            _driverData?['email'] ?? 'Not provided',
+            Icons.email,
+          ),
+          _buildInfoRow(
+            'Bus Number',
+            _driverData?['busNumber'] ?? 'Not assigned',
+            Icons.directions_bus,
+          ),
+          _buildInfoRow(
+            'License Number',
+            _driverData?['licenseNumber'] ?? 'Not provided',
+            Icons.credit_card,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAssignedRoute() {
+    if (_assignedRoute == null) {
+      return ModernCard(
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(AppConstants.spacingL),
+              decoration: BoxDecoration(
+                color: AppConstants.warningColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(AppConstants.radiusL),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.route_outlined,
+                    size: 48,
+                    color: AppConstants.warningColor,
+                  ),
+                  const SizedBox(height: AppConstants.spacingM),
+                  Text(
+                    'No Route Assigned',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppConstants.warningColor,
+                    ),
+                  ),
+                  const SizedBox(height: AppConstants.spacingS),
+                  Text(
+                    'Contact your supervisor to get a route assigned',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppConstants.textSecondary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return GradientCard(
+      gradientColors: [
+        AppConstants.successColor.withValues(alpha: 0.1),
+        AppConstants.successColor.withValues(alpha: 0.05),
+      ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppConstants.spacingS),
+                decoration: BoxDecoration(
+                  color: AppConstants.successColor.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                ),
+                child: Icon(
+                  Icons.route,
+                  color: AppConstants.successColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: AppConstants.spacingM),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Assigned Route',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppConstants.textColor,
+                      ),
+                    ),
+                    Text(
+                      _assignedRoute!.name,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppConstants.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppConstants.spacingS,
+                  vertical: AppConstants.spacingXS,
+                ),
+                decoration: BoxDecoration(
+                  color: AppConstants.successColor.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                ),
+                child: Text(
+                  'ACTIVE',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: AppConstants.successColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppConstants.spacingL),
+          
+          Container(
+            padding: const EdgeInsets.all(AppConstants.spacingM),
+            decoration: BoxDecoration(
+              color: AppConstants.successColor.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(AppConstants.radiusM),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.location_on,
+                      color: AppConstants.successColor,
+                      size: 16,
+                    ),
+                    const SizedBox(width: AppConstants.spacingS),
+                    Expanded(
+                      child: Text(
+                        _assignedRoute!.startPoint,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppConstants.textColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppConstants.spacingS),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.location_on,
+                      color: AppConstants.errorColor,
+                      size: 16,
+                    ),
+                    const SizedBox(width: AppConstants.spacingS),
+                    Expanded(
+                      child: Text(
+                        _assignedRoute!.endPoint,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppConstants.textColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppConstants.spacingM),
+          
+          Row(
+            children: [
+              Expanded(
+                child: _buildRouteStat(
+                  'Distance',
+                  '${_assignedRoute!.distance} km',
+                  Icons.straighten,
+                ),
+              ),
+              Expanded(
+                child: _buildRouteStat(
+                  'Duration',
+                  '${_assignedRoute!.estimatedTime} min',
+                  Icons.access_time,
+                ),
+              ),
+              Expanded(
+                child: _buildRouteStat(
+                  'Stops',
+                  '${_assignedRoute!.stops.length}',
+                  Icons.location_city,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRouteStat(String label, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.spacingM),
+      decoration: BoxDecoration(
+        color: AppConstants.successColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppConstants.radiusM),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            icon,
+            color: AppConstants.successColor,
+            size: 20,
+          ),
+          const SizedBox(height: AppConstants.spacingS),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppConstants.textColor,
+            ),
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: AppConstants.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatistics() {
+    return ModernCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppConstants.spacingS),
+                decoration: BoxDecoration(
+                  color: AppConstants.primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                ),
+                child: Icon(
+                  Icons.analytics_outlined,
+                  color: AppConstants.primaryColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: AppConstants.spacingM),
+              Text(
+                'Statistics',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppConstants.textColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppConstants.spacingL),
+          
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  'Trips Today',
+                  '12',
+                  Icons.directions_bus,
+                  AppConstants.infoColor,
+                ),
+              ),
+              const SizedBox(width: AppConstants.spacingM),
+              Expanded(
+                child: _buildStatCard(
+                  'Hours Worked',
+                  '8.5',
+                  Icons.access_time,
+                  AppConstants.successColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppConstants.spacingM),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  'Passengers',
+                  '156',
+                  Icons.people,
+                  AppConstants.warningColor,
+                ),
+              ),
+              const SizedBox(width: AppConstants.spacingM),
+              Expanded(
+                child: _buildStatCard(
+                  'Rating',
+                  '4.8',
+                  Icons.star,
+                  AppConstants.primaryColor,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.spacingM),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppConstants.radiusM),
+        border: Border.all(
+          color: color.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            icon,
+            color: color,
+            size: 24,
+          ),
+          const SizedBox(height: AppConstants.spacingS),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: AppConstants.textSecondary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActions() {
+    return ModernCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppConstants.spacingS),
+                decoration: BoxDecoration(
+                  color: AppConstants.errorColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                ),
+                child: Icon(
+                  Icons.settings_outlined,
+                  color: AppConstants.errorColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: AppConstants.spacingM),
+              Text(
+                'Actions',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppConstants.textColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppConstants.spacingL),
+          
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    // TODO: Implement edit profile
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Edit profile feature coming soon!')),
+                    );
+                  },
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Edit Profile'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppConstants.infoColor,
+                    foregroundColor: AppConstants.textOnPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: AppConstants.spacingM),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppConstants.spacingM),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _logout,
+                  icon: const Icon(Icons.logout),
+                  label: const Text('Logout'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppConstants.errorColor,
+                    foregroundColor: AppConstants.textOnPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: AppConstants.spacingM),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildInfoRow(String title, String value, IconData icon) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: AppConstants.spacingS),
       child: Row(
         children: [
-          Icon(icon, color: AppConstants.primaryColor),
-          const SizedBox(width: 16),
+          Container(
+            padding: const EdgeInsets.all(AppConstants.spacingS),
+            decoration: BoxDecoration(
+              color: AppConstants.infoColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppConstants.radiusS),
+            ),
+            child: Icon(
+              icon,
+              color: AppConstants.infoColor,
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: AppConstants.spacingM),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppConstants.lightTextColor,
+                    color: AppConstants.textSecondary,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppConstants.spacingXS),
                 Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     color: AppConstants.textColor,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],

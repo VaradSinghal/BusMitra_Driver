@@ -47,14 +47,14 @@ class CustomTextField extends StatelessWidget {
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
-            color: glassEffect ? Colors.white.withValues(alpha: 0.3) : AppConstants.lightTextColor,
+            color: glassEffect ? Colors.white.withValues(alpha: 0.3) : AppConstants.textSecondary,
             width: glassEffect ? 1.0 : 1.5,
           ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
-            color: glassEffect ? Colors.white.withValues(alpha: 0.3) : AppConstants.lightTextColor,
+            color: glassEffect ? Colors.white.withValues(alpha: 0.3) : AppConstants.textSecondary,
             width: glassEffect ? 1.0 : 1.5,
           ),
         ),
